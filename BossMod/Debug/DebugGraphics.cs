@@ -484,8 +484,7 @@ sealed class DebugGraphics
 
         var rotationMatrix = Matrix3x2.CreateRotation(-_overlayRotation.Rad);
 
-        Vector2 TransformPoint(Vector2 point) =>
-            Vector2.Transform(point - _overlayCenter, rotationMatrix) + _overlayCenter;
+        Vector2 TransformPoint(Vector2 point) => Vector2.Transform(point - _overlayCenter, rotationMatrix) + _overlayCenter;
 
         if (_overlayCircle)
         {
@@ -929,6 +928,8 @@ sealed class DebugGraphics
             // DrawWorldPoly for drawing the arena bounds or a custom polygon as needed.
             var center = new Vector3(arena.Center.X, Service.ObjectTable.LocalPlayer!.Position.Y, arena.Center.Z);
             Camera.Instance!.DrawWorldPoly(center, arena.Polygon, Colors.Border, 3f);
+            //Dx11ArenaRenderer.BeginArena(drawList, _bounds.Shape, _center.X, center.Z, _scaledCos, _scaledSin, screenScale);
+
         }
     }
 

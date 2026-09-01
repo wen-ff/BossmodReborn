@@ -82,8 +82,8 @@ sealed class AssaultEvolved2(BossModule module) : Components.SimpleAOEs(module, 
 sealed class AssaultEvolved3(BossModule module) : Components.SimpleAOEs(module, (uint)AID._Weaponskill_AssaultEvolvedAxe, 8f);
 sealed class DanceOfDomination(BossModule module) : Components.RaidwideCast(module, (uint)AID._Weaponskill_DanceOfDomination);
 sealed class Explosion1(BossModule module) : Components.SimpleAOEs(module, (uint)AID._Weaponskill_Explosion, new AOEShapeRect(60f, 5f));
-sealed class Explosion2(BossModule module) : Components.SimpleAOEs(module, (uint)AID._Weaponskill_Explosion, new AOEShapeRect(60f, 5f));
-sealed class Explosion3(BossModule module) : Components.SimpleAOEs(module, (uint)AID._Weaponskill_Explosion, new AOEShapeRect(60f, 3f));
+sealed class Explosion2(BossModule module) : Components.SimpleAOEs(module, (uint)AID._Weaponskill_Explosion1, new AOEShapeRect(60f, 5f));
+sealed class Explosion3(BossModule module) : Components.SimpleAOEs(module, (uint)AID._Weaponskill_Explosion2, new AOEShapeRect(60f, 3f));
 
 sealed class RawSteelTankBuster(BossModule module) : Components.IconSharedTankbuster(module, (uint)IconID.RawSteelSharedTankbuster, (uint)AID._Weaponskill_RawSteel1, 6f);
 sealed class RawSteelSpreads(BossModule module) : Components.SpreadFromIcon(module, (uint)IconID.RawSteelSpread, (uint)AID._Weaponskill_Impact, 6, 0);

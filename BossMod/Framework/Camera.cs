@@ -1,6 +1,7 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using TerraFX.Interop.DirectX;
 
 namespace BossMod;
 
@@ -17,6 +18,8 @@ sealed class Camera
     public float CameraAzimuth; // facing north = 0, facing west = pi/4, facing south = +-pi/2, facing east = -pi/4
     public float CameraAltitude; // facing horizontally = 0, facing down = pi/4, facing up = -pi/4
     public Vector2 ViewportSize;
+    public float _overlayCenterX;
+    public float _overlayCenterY;
 
     private enum WorldPrimitiveRunKind : byte { Lines, Curves }
 
@@ -26,6 +29,39 @@ sealed class Camera
         public int Start;
         public int Count;
         public int CurveLineCount;
+    }
+
+    private enum SegmentKind : byte
+    {
+        Mesh,
+        PrimitiveMesh,
+        PrimitiveTriangleStroke,
+        Stroke,
+        WorldLine,
+        WorldCurve,
+        Analytic,
+        ScreenAnalytic,
+        AnalyticOutline,
+        AnalyticOutlineUnclipped,
+        CustomSdfFill,
+        CustomSdfOutline,
+        ArenaSdfOutline,
+        AnalyticClipEdgeOverlay,
+        CustomClipEdgeOverlay,
+        Text,
+        Sprite
+    }
+
+    public struct Vertex3d
+    {
+        public Vector3 Position;
+        public uint Color;
+
+        public Vertex3d(Vector3 position, uint color)
+        {
+            Position = position;
+            Color = color;
+        }
     }
 
     private readonly List<Dx11ArenaRenderer.WorldLineInstance> _worldDrawLines = [];
@@ -107,6 +143,92 @@ sealed class Camera
             {
                 CollectionsMarshal.SetCount(_worldTransforms, 1);
             }
+        }
+    }
+
+   public void DrawWorldPrimitives(Vector3 arenaCenter, ImDrawListPtr drawList)
+   {
+        if (_worldPrimitiveRuns.Count == 0)
+        {
+            return;
+        }
+
+        var batchStarted = false;
+        try
+        {
+            var viewport = View;
+           // var windowSize = Size ?? new Vector2(400, 400);
+            //var center = viewport.Pos + viewport.Size * 0.5f;
+            //var newPos = center - windowSize * 0.5f;
+            // var viewport = ImGuiHelpers.MainViewport;
+            // public static bool BeginWorldBatch(ImDrawListPtr drawList, Vector2 viewportPos, Vector2 viewportSize, in Matrix4x4 viewProj, in Vector4 nearPlane, ReadOnlySpan<WorldLineTransform> transforms)
+
+            //batchStarted = Dx11ArenaRenderer.BeginWorldBatch(drawList, viewport.Pos, viewport.Size, ViewProj, NearPlane, CollectionsMarshal.AsSpan(_worldTransforms));
+
+            if (Service.ObjectTable.LocalPlayer != null)
+            {
+                var newX = Service.ObjectTable.LocalPlayer.Position.X;
+                var newY = Service.ObjectTable.LocalPlayer.Position.Z;
+
+                _overlayCenterX = newX;
+                _overlayCenterY = newY;
+            }
+
+            // Standalone screen batches (Camera/world overlays) are attached to a background draw list and
+            // therefore provide their viewport explicitly instead of inheriting the current ImGui window
+            //private static bool _buildViewportOverride;
+            //private static Vector2 _buildViewportOverridePos;
+            //private static Vector2 _buildViewportOverrideSize;
+            //batchStarted = Dx11ArenaRenderer.BeginWorldBatch(drawList, center, viewport.Size,Camera.Instance!.ViewProj, Camera.Instance.NearPlane, CollectionsMarshal.AsSpan(_worldTransforms));
+
+            // Starts one standalone screen-space batch on an arbitrary ImGui draw list. This is used by
+            // Camera/world overlays: ImGui only hosts the deferred callback; all line rasterization is DX11.
+            // Coordinates submitted through AppendScreenLine are absolute logical screen coordinates.
+            //public static bool BeginScreenBatch(ImDrawListPtr drawList, Vector2 viewportPos, Vector2 viewportSize)
+            //batchStarted = Dx11ArenaRenderer.BeginScreenBatch(drawList, arenaCenter.XZ(), ViewportSize);
+            //batchStarted = Dx11ArenaRenderer.BeginWorldBatch(ImGui.GetBackgroundDrawList(), viewport.Pos, viewport.Size, ViewProj, NearPlane, CollectionsMarshal.AsSpan(_worldTransforms));
+            //batchStarted = Dx11ArenaRenderer.BeginWorldBatch(drawList, arenaCenter.XZ(), ViewportSize, ViewProj, NearPlane, CollectionsMarshal.AsSpan(_worldTransforms));
+            batchStarted = Dx11ArenaRenderer.BeginWorldBatch(drawList, arenaCenter.XZ(), ViewportSize, ViewProj, NearPlane, CollectionsMarshal.AsSpan(_worldTransforms));
+
+
+
+
+            if (!batchStarted)
+            {
+                return;
+            }
+
+            var lines = CollectionsMarshal.AsSpan(_worldDrawLines);
+            var curves = CollectionsMarshal.AsSpan(_worldDrawCurves);
+            var runs = CollectionsMarshal.AsSpan(_worldPrimitiveRuns);
+            var len = runs.Length;
+            for (var i = 0; i < len; ++i)
+            {
+                ref var run = ref runs[i];
+                if (run.Kind == WorldPrimitiveRunKind.Lines)
+                {
+                    Dx11ArenaRenderer.AppendWorldLines(lines.Slice(run.Start, run.Count));
+
+                }
+                else
+                {
+                    Dx11ArenaRenderer.AppendWorldCurves(curves.Slice(run.Start, run.Count), run.CurveLineCount);
+                }
+            }
+        }
+        finally
+        {
+            //if (batchStarted)
+            //{
+            //    Dx11ArenaRenderer.EndScreenBatch();
+            //}
+            //_worldDrawLines.Clear();
+            //_worldDrawCurves.Clear();
+            //_worldPrimitiveRuns.Clear();
+            //if (_worldTransforms.Count > 1)
+            //{
+            //    CollectionsMarshal.SetCount(_worldTransforms, 1);
+            //}
         }
     }
 
@@ -245,6 +367,7 @@ sealed class Camera
         AppendWorldCurveUnchecked(curve, segmentsP2);
     }
 
+    // Circle outline
     public void DrawWorldCircle(Vector3 center, float radius, uint color, float thickness = 1f)
     {
         const int segments = 256;
@@ -290,6 +413,29 @@ sealed class Camera
         {
             var curr = center + dirs[i].ToVec3();
             AppendWorldLineUnchecked(curr, prev, color, thickness);
+            prev = curr;
+        }
+    }
+
+
+    // Shape agnostic drawing logic. Just pulls in dirs directly and peg it to the vec3 for arena height.
+    public void DrawWorldLineDirs(Vector3 center, WDir[] wdirs, uint color, float thickness = 1)
+    {
+        //var pos = new WPos(center.X, center.Z);
+        //var dirs = shape.Contour(pos);
+        var dirsCount = wdirs.Length;
+
+        _worldDrawLines.EnsureCapacity(_worldDrawLines.Count + dirsCount);
+        // align each line with vec3 center so that it is drawn at the correct Y value.
+        var prev = center + wdirs[dirsCount - 1].ToVec3(); // Start from the last point so we can complete the outline of the shape
+        // If the list of dirs has values we start at dirs[0] for first line and loop through the
+        // array until we end up back at dirs[0]
+        for (var i = 0; i < dirsCount; ++i)
+        {
+            var curr = center + wdirs[i].ToVec3();
+            //AppendWorldLineUnchecked(Unchecked(curr, prev, color, thickness);
+            AppendWorldLineUnchecked(curr, prev, color, thickness);
+
             prev = curr;
         }
     }
@@ -358,4 +504,37 @@ sealed class Camera
         AppendWorldCurveUnchecked(curve, tripleSegments);
         return true;
     }
+
+    //TODO this doesn't actually work
+    /*public void DrawWorldCircleFilled(Vector3 center, float radius, uint color, float thickness = 1f)
+    {
+        ImDrawListPtr drawlist = ImGui.GetBackgroundDrawList();
+        //Vector2 centerPos = center.XZ();
+
+        var p1w = center;
+        //var p2w = end;
+        //if (!ClipLineToNearPlane(ref p1w, ref p2w))
+        //{
+          //  return;
+        //}
+
+        var p1p = Vector4.Transform(p1w, ViewProj);
+        //var p2p = Vector4.Transform(p2w, ViewProj);
+        var p1c = p1p.XY() * (1 / p1p.W); // TODO needs to be wdir
+        //var p2c = p2p.XY() * (1 / p2p.W);
+        var p1screen = new Vector2(0.5f * ViewportSize.X * (1 + p1c.X), 0.5f * ViewportSize.Y * (1 - p1c.Y)) +
+                       ImGuiHelpers.MainViewport.Pos;
+        var p1cScreenWDir = new WDir(p1screen);
+        //var p2screen = new Vector2(0.5f * ViewportSize.X * (1 + p2c.X), 0.5f * ViewportSize.Y * (1 - p2c.Y)) + ImGuiHelpers.MainViewport.Pos;
+        //_worldDrawLines.Add(new(p1screen, p2screen, color, thickness));
+        //Dx11ArenaRenderer.AppendCircle(p1cScreenWDir, radius, color != default ? color : Colors.AOE);
+
+
+        //Dx11ArenaRenderer.AppendAnalytic(centerOffset, new Vector2(outerScreen), default, new Vector4(outerPx, innerPx, 0f, 0f), color);
+
+        // TODO this doesn't work and it seems like there isn't currently a function for drawing filled world circles
+        drawlist.AddCircleFilled(center.XZ(), radius, color, 256);
+        //ImGui.Render();
+
+    }*/
 }

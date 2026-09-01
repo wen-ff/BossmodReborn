@@ -113,6 +113,12 @@ public sealed class BossModuleConfig : ConfigNode
     [PropertyDisplay("Show movement hints in world", tooltip: "Not used very much, but can show you arrows in the game world to indicate where to move for certain mechanics")]
     public bool ShowWorldArrows = false;
 
+    [PropertyDisplay("Dev Experimental: Show arena outlines in world when a module is loaded", tooltip: "Dev use during module making. Simple outline of the loaded arena during a replay or boss module fight.")]
+    public bool ShowWorldArenaOutline = false;
+
+    [PropertyDisplay("Dev Experimental: Show AOE outlines in world when a module is loaded", tooltip: "Dev use during module making. Shows aoe outlines during a module run. Not user friendly for an actual fight.")]
+    public bool ShowWorldArenaAOEOutlines = false;
+
     [PropertyDisplay("Show melee range indicator")]
     public bool ShowMeleeRangeIndicator = false;
 

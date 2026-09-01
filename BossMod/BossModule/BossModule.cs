@@ -279,7 +279,15 @@ public abstract class BossModule : IDisposable
         }
         if (includeArena)
         {
+            //TODO reset this back to normal if needed
+            // Insert player character azimuth even in replays the radar will rotate with you.
+            var cameraInstanceAzimuth = new Angle(0);
+            if (Camera.Instance != null)
+                 cameraInstanceAzimuth = Camera.Instance.CameraAzimuth.Radians();
             Arena.Begin(cameraAzimuth);
+            // This does use the cameras rotation for knowing which way the radar should be oriented.
+            // Affects replays also because it uses your character camera azimuth instead of replay character azimuth.
+            //Arena.Begin(cameraInstanceAzimuth);
             var haveRisks = false;
             var count = pcHints.Count;
             for (var i = 0; i < count; ++i)
@@ -633,6 +641,8 @@ public abstract class BossModule : IDisposable
             if (Service.Texture.TryGetFromGameIcon(iconId, out var tex))
             {
                 var wrap = tex.GetWrapOrEmpty();
+                //var pos = Arena.WorldPositionToScreenPosition(actor.Position);
+                //var actor.Position = new Vector3(actor.Position.X,)
                 var pos = Arena.WorldPositionToScreenPosition(actor.Position);
                 var scale = WindowConfig.ArenaScale * 24f;
 

@@ -1684,6 +1684,44 @@ public static unsafe partial class Dx11ArenaRenderer
         var outerPx = outerRadius * _buildWorldPixelScale;
         var innerPx = innerRadius * _buildWorldPixelScale;
         AppendAnalytic(centerOffset, new Vector2(outerScreen), default, new Vector4(outerPx, innerPx, 0f, 0f), color);
+        var config = Service.Config.Get<BossModuleConfig>();
+
+        if (config.ShowWorldArrows)
+        {
+            var p1w = centerOffset.ToVec2();
+            //var p2w = end;
+            //if (!ClipLineToNearPlane(ref p1w, ref p2w))
+            //{
+            //  return;
+            //}
+
+            var p1p = Vector4.Transform(p1w, Camera.Instance.ViewProj);
+            //var p2p = Vector4.Transform(p2w, ViewProj);
+            var p1c = p1p.XY() * (1 / p1p.W); // TODO needs to be wdir
+            //var p2c = p2p.XY() * (1 / p2p.W);
+            var p1screen = new Vector2(0.5f * Camera.Instance.ViewportSize.X * (1 + p1c.X), 0.5f * Camera.Instance.ViewportSize.Y * (1 - p1c.Y)) + ImGui.GetMainViewport().Pos;
+            var p1cScreenWDir = new WDir(p1screen);
+            AppendAnalytic(p1cScreenWDir, new Vector2(outerRadius), default, new Vector4(outerPx, innerPx, 0f, 0f), color);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AppendWorldDonut(in WDir centerOffset, float innerRadius, float outerRadius, uint color) => AppendWorldCircleDonut(centerOffset, innerRadius, outerRadius, color, isDonut: true);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void AppendWorldCircleDonut(in WDir centerOffset, float innerRadius, float outerRadius, uint color, bool isDonut)
+    {
+        if (!IsInitialized || !_arenaActive || outerRadius <= 0f || innerRadius >= outerRadius)
+        {
+            return;
+        }
+
+        innerRadius = Math.Max(0f, innerRadius);
+        var outerScreen = outerRadius * _buildScreenScale;;
+        EnsureArenaPrepared();
+        var outerPx = outerRadius * _buildWorldPixelScale;
+        var innerPx = innerRadius * _buildWorldPixelScale;
+        AppendAnalytic(centerOffset, new Vector2(outerScreen), default, new Vector4(outerPx, innerPx, 0f, 0f), color);
     }
 
     // Adds an analytic directional rectangle
